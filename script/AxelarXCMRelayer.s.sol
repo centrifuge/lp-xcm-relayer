@@ -11,7 +11,7 @@ contract AxelarXCMRelayerScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        admin = vm.envAddress("ADMIN");
+        address admin = vm.envAddress("ADMIN");
 
         AxelarXCMRelayer router = new AxelarXCMRelayer(
             address(vm.envAddress("CENTRIFUGE_CHAIN_ORIGIN")),
