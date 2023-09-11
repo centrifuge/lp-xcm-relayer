@@ -22,19 +22,13 @@ interface PrecompileLike {
 }
 
 contract AxelarForwarder is Auth {
-
     PrecompileLike public constant precompile = PrecompileLike(0x0000000000000000000000000000000000002048);
 
     AxelarGatewayLike public axelarGateway;
-    
+
     // --- Events ---
     event File(bytes32 indexed what, address data);
-    event Forwarded(
-        bytes32 commandId,
-        string sourceChain,
-        string sourceAddress,
-        bytes payload
-    );
+    event Forwarded(bytes32 commandId, string sourceChain, string sourceAddress, bytes payload);
 
     constructor(address axelarGateway_) {
         axelarGateway = AxelarGatewayLike(axelarGateway_);
@@ -44,10 +38,7 @@ contract AxelarForwarder is Auth {
     }
 
     // --- Administration ---
-    function file(bytes32 what, address data)
-        external
-        auth
-    {
+    function file(bytes32 what, address data) external auth {
         if (what == "axelarGateway") {
             axelarGateway = AxelarGatewayLike(data);
         } else {
@@ -57,6 +48,7 @@ contract AxelarForwarder is Auth {
         emit File(what, data);
     }
     // --- Incoming ---
+
     function execute(
         bytes32 commandId,
         string calldata sourceChain,
