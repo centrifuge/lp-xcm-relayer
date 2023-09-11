@@ -13,10 +13,10 @@ contract AxelarXCMRelayerScript is Script {
 
         address admin = vm.envAddress("ADMIN");
 
-        AxelarXCMRelayer router = new AxelarXCMRelayer(
-            address(vm.envAddress("CENTRIFUGE_CHAIN_ORIGIN")),
-            address(vm.envAddress("AXELAR_GATEWAY"))
-        );
+        AxelarXCMRelayer router = new AxelarXCMRelayer();
+
+        router.file("centrifugeChainOrigin", address(vm.envAddress("CENTRIFUGE_CHAIN_ORIGIN")));
+        router.file("axelarGateway", address(vm.envAddress("AXELAR_GATEWAY")));
 
         router.rely(admin);
         router.deny(address(this));
