@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.21;
 
-import {AxelarXCMRelayer} from "src/XCMRelayer.sol";
+import {AxelarForwarder} from "src/Forwarder.sol";
 import "forge-std/Script.sol";
 
 // Script to deploy Axelar over XCM relayer.
-contract AxelarXCMRelayerScript is Script {
+contract AxelarForwarderScript is Script {
     function setUp() public {}
 
     function run() public {
@@ -13,10 +13,9 @@ contract AxelarXCMRelayerScript is Script {
 
         address admin = vm.envAddress("ADMIN");
 
-        AxelarXCMRelayer router = new AxelarXCMRelayer();
-
-        router.file("centrifugeChainOrigin", address(vm.envAddress("CENTRIFUGE_CHAIN_ORIGIN")));
-        router.file("axelarGateway", address(vm.envAddress("AXELAR_GATEWAY")));
+        AxelarForwarder router = new AxelarForwarder(
+            address(vm.envAddress("AXELAR_GATEWAY"))
+        );
 
         router.rely(admin);
         router.deny(address(this));

@@ -36,9 +36,6 @@ struct XcmWeightInfo {
 }
 
 interface AxelarGatewayLike {
-    function callContract(string calldata destinationChain, string calldata contractAddress, bytes calldata payload)
-        external;
-
     function validateContractCall(
         bytes32 commandId,
         string calldata sourceChain,
@@ -51,13 +48,14 @@ contract AxelarXCMRelayer is Auth {
     address private constant XCM_TRANSACTOR_V2_ADDRESS = 0x000000000000000000000000000000000000080D;
     uint32 private constant CENTRIFUGE_PARACHAIN_ID = 2031;
 
-    AxelarGatewayLike public immutable axelarGateway;
-    address public immutable centrifugeChainOrigin;
+    AxelarGatewayLike public axelarGateway;
+    address public centrifugeChainOrigin;
     mapping(string => string) public axelarEVMRouters;
 
     XcmWeightInfo public xcmWeightInfo;
 
     // --- Events ---
+    event File(bytes32 indexed what, address data);
     event File(bytes32 indexed what, XcmWeightInfo xcmWeightInfo);
     event File(bytes32 indexed what, string chain, string addr);
     event Executed(
@@ -71,10 +69,7 @@ contract AxelarXCMRelayer is Auth {
         bytes payload
     );
 
-    constructor(address centrifugeChainOrigin_, address axelarGateway_) {
-        centrifugeChainOrigin = centrifugeChainOrigin_;
-        axelarGateway = AxelarGatewayLike(axelarGateway_);
-
+    constructor() {
         xcmWeightInfo = XcmWeightInfo({
             buyExecutionWeightLimit: 19000000000,
             transactWeightAtMost: 8000000000,
@@ -99,6 +94,18 @@ contract AxelarXCMRelayer is Auth {
     }
 
     // --- Administration ---
+    function file(bytes32 what, address data) external auth {
+        if (what == "centrifugeChainOrigin") {
+            centrifugeChainOrigin = data;
+        } else if (what == "axelarGateway") {
+            axelarGateway = AxelarGatewayLike(data);
+        } else {
+            revert("AxelarXCMRelayer/file-unrecognized-param");
+        }
+
+        emit File(what, data);
+    }
+
     function file(bytes32 what, string calldata axelarEVMRouterChain, string calldata axelarEVMRouterAddress)
         external
         auth
@@ -178,15 +185,7 @@ contract AxelarXCMRelayer is Auth {
         return;
     }
 
-    // --- Outgoing ---
-    // A message that has been sent from the Centrifuge Chain, heading to a specific destination EVM chain
-    function send(string calldata destinationChain, string calldata destinationAddress, bytes calldata payload)
-        external
-        onlyCentrifugeChain
-    {
-        axelarGateway.callContract(destinationChain, destinationAddress, payload);
-    }
-
+    // --- Helpers ---
     function _centrifugeParachainMultilocation() internal pure returns (Multilocation memory) {
         bytes[] memory interior = new bytes[](1);
         interior[0] = _parachainId();
