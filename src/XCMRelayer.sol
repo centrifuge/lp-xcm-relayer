@@ -88,7 +88,8 @@ contract AxelarXCMRelayer is Auth {
             feeAmount: 1000000000000000000
         });
         centrifugeChainLiquidityPoolsGatewayPalletIndex = centrifugeChainLiquidityPoolsGatewayPalletIndex_;
-        centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex = centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_;
+        centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex =
+            centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_;
 
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -180,7 +181,7 @@ contract AxelarXCMRelayer is Auth {
     }
 
     /// TMP: Test execute a given LP msg
-    function test_execute_msg(bytes memory message) {
+    function test_execute_msg(bytes memory message) public {
         bytes memory encodedCall = _centrifugeCall(message);
 
         XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
@@ -203,7 +204,7 @@ contract AxelarXCMRelayer is Auth {
     }
 
     /// TMP: Test execute a given Centrifuge chain encoded call
-    function test_execute_call(bytes memory encodedCall) {
+    function test_execute_call(bytes memory encodedCall) public {
         XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
             // dest chain
             _centrifugeParachainMultilocation(),
@@ -258,14 +259,14 @@ contract AxelarXCMRelayer is Auth {
     // --- Utilities ---
     function _centrifugeCall(bytes memory message) internal view returns (bytes memory) {
         return abi.encodePacked(
-        // The Centrifuge liquidity-pools pallet index
-        centrifugeChainLiquidityPoolsGatewayPalletIndex,
-        // The `handle` call index within the liquidity-pools pallet
-        centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex,
-        // We need to specify the length of the message in the scale-encoding format
-        messageLengthScaleEncoded(message),
-        // The connector message itself
-        message
+            // The Centrifuge liquidity-pools pallet index
+            centrifugeChainLiquidityPoolsGatewayPalletIndex,
+            // The `handle` call index within the liquidity-pools pallet
+            centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex,
+            // We need to specify the length of the message in the scale-encoding format
+            messageLengthScaleEncoded(message),
+            // The connector message itself
+            message
         );
     }
 
@@ -278,7 +279,7 @@ contract AxelarXCMRelayer is Auth {
 
         if (call == Call.Transfer) {
             return hex"8501";
-        } else if (call == Call.transferTrancheTokens(_msg)) {
+        } else if (call == Call.TransferTrancheTokens) {
             // A TransferTrancheTokens message is 82 bytes long which encodes to 0x4901 in Scale
             return hex"4901";
         } else if (call == Call.IncreaseInvestOrder) {
@@ -297,12 +298,10 @@ contract AxelarXCMRelayer is Auth {
             revert("AxelarXCMRelayer/unsupported-outgoing-message");
         }
     }
-
 }
 
-
 enum Call
-    /// 0 - An invalid message
+/// 0 - An invalid message
 {
     Invalid,
     /// 1 - Add a currency id -> EVM address mapping
@@ -355,11 +354,11 @@ enum Call
     UpdateTrancheInvestmentLimit
 }
 
-function messageType(bytes memory _msg) internal pure returns (Call _call) {
+function messageType(bytes memory _msg) pure returns (Call _call) {
     _call = Call(toUint8(_msg, 0));
 }
 
-function toUint8(bytes memory _bytes, uint256 _start) internal pure returns (uint8) {
+function toUint8(bytes memory _bytes, uint256 _start) pure returns (uint8) {
     require(_bytes.length >= _start + 1, "toUint8_outOfBounds");
     uint8 tempUint;
 
