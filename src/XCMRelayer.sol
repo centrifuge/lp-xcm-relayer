@@ -56,6 +56,8 @@ contract AxelarXCMRelayer is Auth {
     mapping(string => string) public axelarEVMRouters;
 
     XcmWeightInfo public xcmWeightInfo;
+    uint8 public immutable centrifugeChainLiquidityPoolsGatewayPalletIndex;
+    uint8 public immutable centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex;
 
     // --- Events ---
     event File(bytes32 indexed what, XcmWeightInfo xcmWeightInfo);
@@ -71,7 +73,12 @@ contract AxelarXCMRelayer is Auth {
         bytes payload
     );
 
-    constructor(address centrifugeChainOrigin_, address axelarGateway_) {
+    constructor(
+        address centrifugeChainOrigin_,
+        address axelarGateway_,
+        uint8 centrifugeChainLiquidityPoolsGatewayPalletIndex_,
+        uint8 centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_
+    ) {
         centrifugeChainOrigin = centrifugeChainOrigin_;
         axelarGateway = AxelarGatewayLike(axelarGateway_);
 
@@ -80,6 +87,8 @@ contract AxelarXCMRelayer is Auth {
             transactWeightAtMost: 8000000000,
             feeAmount: 1000000000000000000
         });
+        centrifugeChainLiquidityPoolsGatewayPalletIndex = centrifugeChainLiquidityPoolsGatewayPalletIndex_;
+        centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex = centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_;
 
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -138,15 +147,7 @@ contract AxelarXCMRelayer is Auth {
             "XCMRelayer/not-approved-by-gateway"
         );
 
-        bytes memory payloadWithLocation = bytes.concat(
-            "0x73",
-            "0x05",
-            bytes32(bytes(sourceChain).length),
-            bytes(sourceChain),
-            bytes32(bytes(sourceAddress).length),
-            bytes(sourceAddress),
-            payload
-        );
+        bytes memory encodedCall = _centrifugeCall(message);
 
         emit Executed(
             payloadWithLocation,
@@ -208,5 +209,44 @@ contract AxelarXCMRelayer is Auth {
 
     function _parachainId() internal pure returns (bytes memory) {
         return abi.encodePacked(uint8(0), CENTRIFUGE_PARACHAIN_ID);
+    }
+
+    // --- Utilities ---
+    function _centrifugeCall(bytes memory message) internal view returns (bytes memory) {
+        return abi.encodePacked(
+        // The Centrifuge liquidity-pools pallet index
+        centrifugeChainLiquidityPoolsGatewayPalletIndex,
+        // The `handle` call index within the liquidity-pools pallet
+        centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex,
+        // We need to specify the length of the message in the scale-encoding format
+        messageLengthScaleEncoded(message),
+        // The connector message itself
+        message
+        );
+    }
+
+    // Obtain the Scale-encoded length of a given message. Each Liquidity Pools Message is fixed-sized and
+    // have thus a fixed scale-encoded length associated to which message variant (aka Call).
+    function messageLengthScaleEncoded(bytes memory _msg) internal pure returns (bytes memory) {
+        if (Messages.isTransfer(_msg)) {
+            return hex"8501";
+        } else if (Messages.isTransferTrancheTokens(_msg)) {
+            // A TransferTrancheTokens message is 82 bytes long which encodes to 0x4901 in Scale
+            return hex"4901";
+        } else if (Messages.isIncreaseInvestOrder(_msg)) {
+            return hex"6501";
+        } else if (Messages.isDecreaseInvestOrder(_msg)) {
+            return hex"6501";
+        } else if (Messages.isIncreaseRedeemOrder(_msg)) {
+            return hex"6501";
+        } else if (Messages.isDecreaseRedeemOrder(_msg)) {
+            return hex"6501";
+        } else if (Messages.isCollectInvest(_msg)) {
+            return hex"e4";
+        } else if (Messages.isCollectRedeem(_msg)) {
+            return hex"e4";
+        } else {
+            revert("AxelarXCMRelayer/unsupported-outgoing-message");
+        }
     }
 }
