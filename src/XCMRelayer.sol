@@ -150,7 +150,7 @@ contract AxelarXCMRelayer is Auth {
         bytes memory encodedCall = _centrifugeCall(message);
 
         emit Executed(
-            payloadWithLocation,
+            encodedCall,
             "0x73",
             "0x05",
             bytes32(bytes(sourceChain).length),
@@ -168,7 +168,7 @@ contract AxelarXCMRelayer is Auth {
             // the weight limit for the transact call execution
             xcmWeightInfo.transactWeightAtMost,
             // the call to be executed on the cent chain
-            payloadWithLocation,
+            encodedCall,
             // the CFG we offer to pay for execution fees of the whole XCM
             xcmWeightInfo.feeAmount,
             // overall XCM weight, the total weight the XCM-transactor extrinsic can use.
@@ -191,7 +191,7 @@ contract AxelarXCMRelayer is Auth {
             // the weight limit for the transact call execution
             xcmWeightInfo.transactWeightAtMost,
             // the call to be executed on the cent chain
-            payloadWithLocation,
+            encodedCall,
             // the CFG we offer to pay for execution fees of the whole XCM
             xcmWeightInfo.feeAmount,
             // overall XCM weight, the total weight the XCM-transactor extrinsic can use.
@@ -212,7 +212,7 @@ contract AxelarXCMRelayer is Auth {
             // the weight limit for the transact call execution
             xcmWeightInfo.transactWeightAtMost,
             // the call to be executed on the cent chain
-            payloadWithLocation,
+            encodedCall,
             // the CFG we offer to pay for execution fees of the whole XCM
             xcmWeightInfo.feeAmount,
             // overall XCM weight, the total weight the XCM-transactor extrinsic can use.
