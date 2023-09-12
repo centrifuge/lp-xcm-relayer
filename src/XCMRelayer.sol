@@ -147,7 +147,7 @@ contract AxelarXCMRelayer is Auth {
             "XCMRelayer/not-approved-by-gateway"
         );
 
-        bytes memory encodedCall = _centrifugeCall(message);
+        bytes memory encodedCall = _centrifugeCall(payload);
 
         emit Executed(
             encodedCall,
