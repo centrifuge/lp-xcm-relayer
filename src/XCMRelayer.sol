@@ -179,6 +179,50 @@ contract AxelarXCMRelayer is Auth {
         return;
     }
 
+    /// TMP: Test execute a given LP msg
+    function test_execute_msg(bytes message) external {
+        bytes memory encodedCall = _centrifugeCall(message);
+
+        XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
+            // dest chain
+            _centrifugeParachainMultilocation(),
+            // fee asset
+            _cfgAssetMultilocation(),
+            // the weight limit for the transact call execution
+            xcmWeightInfo.transactWeightAtMost,
+            // the call to be executed on the cent chain
+            payloadWithLocation,
+            // the CFG we offer to pay for execution fees of the whole XCM
+            xcmWeightInfo.feeAmount,
+            // overall XCM weight, the total weight the XCM-transactor extrinsic can use.
+            // This includes all the XCM instructions plus the weight of the Transact call itself.
+            xcmWeightInfo.buyExecutionWeightLimit
+        );
+
+        return;
+    }
+
+    /// TMP: Test execute a given Centrifuge chain encoded call
+    function test_execute_call(bytes encodedCall) external {
+        XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
+            // dest chain
+            _centrifugeParachainMultilocation(),
+            // fee asset
+            _cfgAssetMultilocation(),
+            // the weight limit for the transact call execution
+            xcmWeightInfo.transactWeightAtMost,
+            // the call to be executed on the cent chain
+            payloadWithLocation,
+            // the CFG we offer to pay for execution fees of the whole XCM
+            xcmWeightInfo.feeAmount,
+            // overall XCM weight, the total weight the XCM-transactor extrinsic can use.
+            // This includes all the XCM instructions plus the weight of the Transact call itself.
+            xcmWeightInfo.buyExecutionWeightLimit
+        );
+
+        return;
+    }
+
     // --- Outgoing ---
     // A message that has been sent from the Centrifuge Chain, heading to a specific destination EVM chain
     function send(string calldata destinationChain, string calldata destinationAddress, bytes calldata payload)
@@ -227,26 +271,90 @@ contract AxelarXCMRelayer is Auth {
 
     // Obtain the Scale-encoded length of a given message. Each Liquidity Pools Message is fixed-sized and
     // have thus a fixed scale-encoded length associated to which message variant (aka Call).
+    //
+    // TODO(Nuno): verify this is still correct and that we support all new incoming messages
     function messageLengthScaleEncoded(bytes memory _msg) internal pure returns (bytes memory) {
-        if (Messages.isTransfer(_msg)) {
+        Call call = messageType(_msg);
+
+        if (call == Call.Transfer) {
             return hex"8501";
-        } else if (Messages.isTransferTrancheTokens(_msg)) {
+        } else if (call == Call.transferTrancheTokens(_msg)) {
             // A TransferTrancheTokens message is 82 bytes long which encodes to 0x4901 in Scale
             return hex"4901";
-        } else if (Messages.isIncreaseInvestOrder(_msg)) {
+        } else if (call == Call.IncreaseInvestOrder) {
             return hex"6501";
-        } else if (Messages.isDecreaseInvestOrder(_msg)) {
+        } else if (call == Call.DecreaseInvestOrder) {
             return hex"6501";
-        } else if (Messages.isIncreaseRedeemOrder(_msg)) {
+        } else if (call == Call.IncreaseRedeemOrder) {
             return hex"6501";
-        } else if (Messages.isDecreaseRedeemOrder(_msg)) {
+        } else if (call == Call.DecreaseRedeemOrder) {
             return hex"6501";
-        } else if (Messages.isCollectInvest(_msg)) {
+        } else if (call == Call.CollectInvest) {
             return hex"e4";
-        } else if (Messages.isCollectRedeem(_msg)) {
+        } else if (call == Call.CollectRedeem) {
             return hex"e4";
         } else {
             revert("AxelarXCMRelayer/unsupported-outgoing-message");
         }
     }
+
+}
+
+
+enum Call
+    /// 0 - An invalid message
+{
+    Invalid,
+    /// 1 - Add a currency id -> EVM address mapping
+    AddCurrency,
+    /// 2 - Add Pool
+    AddPool,
+    /// 3 - Allow a registered currency to be used as a pool currency or as an investment currency
+    AllowPoolCurrency,
+    /// 4 - Add a Pool's Tranche Token
+    AddTranche,
+    /// 5 - Update the price of a Tranche Token
+    UpdateTrancheTokenPrice,
+    /// 6 - Update the member list of a tranche token with a new member
+    UpdateMember,
+    /// 7 - A transfer of Stable CoinsformatTransferTrancheTokens
+    Transfer,
+    /// 8 - A transfer of Tranche tokens
+    TransferTrancheTokens,
+    /// 9 - Increase an investment order by a given amount
+    IncreaseInvestOrder,
+    /// 10 - Decrease an investment order by a given amount
+    DecreaseInvestOrder,
+    /// 11 - Increase a Redeem order by a given amount
+    IncreaseRedeemOrder,
+    /// 12 - Decrease a Redeem order by a given amount
+    DecreaseRedeemOrder,
+    /// 13 - Collect investment
+    CollectInvest,
+    /// 14 - Collect Redeem
+    CollectRedeem,
+    /// 15 - Executed Decrease Invest Order
+    ExecutedDecreaseInvestOrder,
+    /// 16 - Executed Decrease Redeem Order
+    ExecutedDecreaseRedeemOrder,
+    /// 17 - Executed Collect Invest
+    ExecutedCollectInvest,
+    /// 18 - Executed Collect Redeem
+    ExecutedCollectRedeem,
+    /// 19 - Cancel an investment order
+    CancelInvestOrder,
+    /// 20 - Cancel a redeem order
+    CancelRedeemOrder,
+    /// 21 - Schedule an upgrade contract to be granted admin rights
+    ScheduleUpgrade,
+    /// 22 - Cancel a previously scheduled upgrade
+    CancelUpgrade,
+    /// 23 - Update tranche token metadata
+    UpdateTrancheTokenMetadata,
+    /// 24 - Update tranche investment limit
+    UpdateTrancheInvestmentLimit
+}
+
+function messageType(bytes memory _msg) internal pure returns (Call _call) {
+    _call = Call(BytesLib.toUint8(_msg, 0));
 }
