@@ -15,9 +15,9 @@ contract AxelarXCMRelayerScript is Script {
 
         AxelarXCMRelayer router = new AxelarXCMRelayer(
             address(vm.envAddress("CENTRIFUGE_CHAIN_ORIGIN")),
-            address(vm.envAddress("AXELAR_GATEWAY")),
-            uint8(vm.envUint("CENTRIFUGE_CHAIN_LIQUIDITY_POOLS_GATEWAY_PALLET_INDEX")),
-            uint8(vm.envUint("CENTRIFUGE_CHAIN_LIQUIDITY_POOLS_GATEWAY_PALLET_PROCESS_MSG_CALL_INDEX"))
+            address(vm.envAddress("AXELAR_GATEWAY"))
+    //            uint8(vm.envUint("CENTRIFUGE_CHAIN_LIQUIDITY_POOLS_GATEWAY_PALLET_INDEX")),
+    //            uint8(vm.envUint("CENTRIFUGE_CHAIN_LIQUIDITY_POOLS_GATEWAY_PALLET_PROCESS_MSG_CALL_INDEX"))
         );
 
         router.rely(admin);

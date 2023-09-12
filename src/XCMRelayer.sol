@@ -56,8 +56,8 @@ contract AxelarXCMRelayer is Auth {
     mapping(string => string) public axelarEVMRouters;
 
     XcmWeightInfo public xcmWeightInfo;
-    uint8 public immutable centrifugeChainLiquidityPoolsGatewayPalletIndex;
-    uint8 public immutable centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex;
+    //    uint8 public immutable centrifugeChainLiquidityPoolsGatewayPalletIndex;
+    //    uint8 public immutable centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex;
 
     // --- Events ---
     event File(bytes32 indexed what, XcmWeightInfo xcmWeightInfo);
@@ -73,12 +73,10 @@ contract AxelarXCMRelayer is Auth {
         bytes payload
     );
 
-    constructor(
-        address centrifugeChainOrigin_,
-        address axelarGateway_,
-        uint8 centrifugeChainLiquidityPoolsGatewayPalletIndex_,
-        uint8 centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_
-    ) {
+    constructor(address centrifugeChainOrigin_, address axelarGateway_) 
+    //        uint8 centrifugeChainLiquidityPoolsGatewayPalletIndex_,
+    //        uint8 centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_
+    {
         centrifugeChainOrigin = centrifugeChainOrigin_;
         axelarGateway = AxelarGatewayLike(axelarGateway_);
 
@@ -87,9 +85,9 @@ contract AxelarXCMRelayer is Auth {
             transactWeightAtMost: 8000000000,
             feeAmount: 1000000000000000000
         });
-        centrifugeChainLiquidityPoolsGatewayPalletIndex = centrifugeChainLiquidityPoolsGatewayPalletIndex_;
-        centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex =
-            centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_;
+        //        centrifugeChainLiquidityPoolsGatewayPalletIndex = centrifugeChainLiquidityPoolsGatewayPalletIndex_;
+        //        centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex =
+        //            centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_;
 
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -148,12 +146,13 @@ contract AxelarXCMRelayer is Auth {
             "XCMRelayer/not-approved-by-gateway"
         );
 
-        bytes memory encodedCall = _centrifugeCall(payload);
+        // todo(nuno): fix length passed here
+        bytes memory encodedCall = _centrifugeCall(hex"00", sourceChain, sourceAddress, payload);
 
         emit Executed(
             encodedCall,
-            "0x73",
-            "0x05",
+            hex"73",
+            hex"05",
             bytes32(bytes(sourceChain).length),
             bytes(sourceChain),
             bytes32(bytes(sourceAddress).length),
@@ -180,9 +179,23 @@ contract AxelarXCMRelayer is Auth {
         return;
     }
 
-    /// TMP: Test execute a given LP msg
-    function test_execute_msg(bytes memory message) public {
-        bytes memory encodedCall = _centrifugeCall(message);
+    function test_get_encoded_call(
+        bytes memory length,
+        string calldata sourceChain,
+        string calldata sourceAddress,
+        bytes memory message
+    ) public pure returns (bytes memory) {
+        return _centrifugeCall(length, sourceChain, sourceAddress, message);
+    }
+
+    /// TMP: Test execute
+    function test_execute_msg(
+        bytes memory length,
+        string calldata sourceChain,
+        string calldata sourceAddress,
+        bytes memory message
+    ) public {
+        bytes memory encodedCall = _centrifugeCall(length, sourceChain, sourceAddress, message);
 
         XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
             // dest chain
@@ -257,15 +270,19 @@ contract AxelarXCMRelayer is Auth {
     }
 
     // --- Utilities ---
-    function _centrifugeCall(bytes memory message) internal view returns (bytes memory) {
+    function _centrifugeCall(
+        bytes memory payloadLength,
+        string memory sourceChain,
+        string memory sourceAddress,
+        bytes memory message
+    ) internal pure returns (bytes memory) {
         return abi.encodePacked(
-            // The Centrifuge liquidity-pools pallet index
-            centrifugeChainLiquidityPoolsGatewayPalletIndex,
-            // The `handle` call index within the liquidity-pools pallet
-            centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex,
-            // We need to specify the length of the message in the scale-encoding format
-            messageLengthScaleEncoded(message),
-            // The connector message itself
+            hex"7305",
+            payloadLength,
+            bytes32(bytes(sourceChain).length),
+            bytes(sourceChain),
+            bytes32(bytes(sourceAddress).length),
+            bytes(sourceAddress),
             message
         );
     }
