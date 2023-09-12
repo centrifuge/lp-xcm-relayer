@@ -180,7 +180,7 @@ contract AxelarXCMRelayer is Auth {
     }
 
     /// TMP: Test execute a given LP msg
-    function test_execute_msg(bytes message) external {
+    function test_execute_msg(bytes memory message) {
         bytes memory encodedCall = _centrifugeCall(message);
 
         XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
@@ -203,7 +203,7 @@ contract AxelarXCMRelayer is Auth {
     }
 
     /// TMP: Test execute a given Centrifuge chain encoded call
-    function test_execute_call(bytes encodedCall) external {
+    function test_execute_call(bytes memory encodedCall) {
         XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
             // dest chain
             _centrifugeParachainMultilocation(),
