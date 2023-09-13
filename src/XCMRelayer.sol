@@ -146,8 +146,9 @@ contract AxelarXCMRelayer is Auth {
             "XCMRelayer/not-approved-by-gateway"
         );
 
+        bytes memory processMsgPayload = _processMsgPayload(sourceChain, sourceAddress, payload);
         // todo(nuno): fix length passed here
-        bytes memory encodedCall = _centrifugeCall(hex"00", sourceChain, sourceAddress, payload);
+        bytes memory encodedCall = _centrifugeCall(hex"00", processMsgPayload);
 
         emit Executed(
             encodedCall,
@@ -179,23 +180,33 @@ contract AxelarXCMRelayer is Auth {
         return;
     }
 
+    /// TMP: Test execute
     function test_get_encoded_call(
         bytes memory length,
         string calldata sourceChain,
         string calldata sourceAddress,
         bytes memory message
     ) public pure returns (bytes memory) {
-        return _centrifugeCall(length, sourceChain, sourceAddress, message);
+        return _centrifugeCall(length, _processMsgPayload(sourceChain, sourceAddress, message));
     }
 
-    /// TMP: Test execute
-    function test_execute_msg(
+    /// TMP
+    function test_get_process_msg_payload(
+        string calldata sourceChain,
+        string calldata sourceAddress,
+        bytes memory message
+    ) public pure returns (bytes memory) {
+        return _processMsgPayload(sourceChain, sourceAddress, message);
+    }
+
+    /// TMP: Test execute given all the indiviual params
+    function test_execute_granular(
         bytes memory length,
         string calldata sourceChain,
         string calldata sourceAddress,
         bytes memory message
     ) public {
-        bytes memory encodedCall = _centrifugeCall(length, sourceChain, sourceAddress, message);
+        bytes memory encodedCall = _centrifugeCall(length, _processMsgPayload(sourceChain, sourceAddress, message));
 
         XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
             // dest chain
@@ -217,7 +228,7 @@ contract AxelarXCMRelayer is Auth {
     }
 
     /// TMP: Test execute a given Centrifuge chain encoded call
-    function test_execute_call(bytes memory encodedCall) public {
+    function test_execute_call_whole(bytes memory encodedCall) public {
         XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
             // dest chain
             _centrifugeParachainMultilocation(),
@@ -271,22 +282,56 @@ contract AxelarXCMRelayer is Auth {
 }
 
 // --- Utilities ---
-function _centrifugeCall(
-    bytes memory payloadLength,
-    string memory sourceChain,
-    string memory sourceAddress,
-    bytes memory message
-) pure returns (bytes memory) {
+function _centrifugeCall(bytes memory payloadLength, bytes memory payload) pure returns (bytes memory) {
     return abi.encodePacked(
         // LP Gateway pallet
         hex"73",
         // LP Gateway process_msg call index
         hex"05",
         payloadLength,
-        bytes32(bytes(sourceChain).length),
-        bytes(sourceChain),
-        bytes32(bytes(sourceAddress).length),
-        bytes(sourceAddress),
+        payload
+    );
+}
+
+// Encode the LiquidityPoolsGateway.process_msg payload
+function _processMsgPayload(string memory sourceChain, string memory sourceAddress, bytes memory message)
+    pure
+    returns (bytes memory)
+{
+    bytes memory sourceChainBytes = bytes(sourceChain);
+    bytes memory sourceAddressBytes = fromHex(sourceAddress);
+
+    return abi.encodePacked(
+        uint32(sourceChainBytes.length),
+        sourceChainBytes,
+        uint32(sourceAddressBytes.length),
+        sourceAddressBytes,
         message
     );
+}
+
+// Convert an hexadecimal character to their byte value
+function fromHexChar(uint8 c) pure returns (uint8) {
+    if (bytes1(c) >= bytes1("0") && bytes1(c) <= bytes1("9")) {
+        return c - uint8(bytes1("0"));
+    }
+    if (bytes1(c) >= bytes1("a") && bytes1(c) <= bytes1("f")) {
+        return 10 + c - uint8(bytes1("a"));
+    }
+    if (bytes1(c) >= bytes1("A") && bytes1(c) <= bytes1("F")) {
+        return 10 + c - uint8(bytes1("A"));
+    }
+    revert("Failed to encode hex char");
+}
+
+// Convert an hexadecimal string to raw bytes
+function fromHex(string memory s) pure returns (bytes memory) {
+    bytes memory ss = bytes(s);
+    require(ss.length % 2 == 0); // length must be even
+    bytes memory r = new bytes(ss.length / 2);
+
+    for (uint256 i = 0; i < ss.length / 2; ++i) {
+        r[i] = bytes1(fromHexChar(uint8(ss[2 * i])) * 16 + fromHexChar(uint8(ss[2 * i + 1])));
+    }
+    return r;
 }
