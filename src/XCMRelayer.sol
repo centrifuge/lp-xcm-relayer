@@ -298,14 +298,11 @@ function _processMsgPayload(string memory sourceChain, string memory sourceAddre
     pure
     returns (bytes memory)
 {
-    bytes memory sourceChainBytes = bytes(sourceChain);
-    bytes memory sourceAddressBytes = bytes(sourceAddress);
-
     return abi.encodePacked(
-        uint32(sourceChainBytes.length),
-        sourceChainBytes,
-        uint32(sourceAddressBytes.length),
-        sourceAddressBytes,
+        uint32(bytes(sourceChain).length),
+        sourceChain,
+        uint32(bytes(sourceAddress).length),
+        sourceAddress,
         message
     );
 }
