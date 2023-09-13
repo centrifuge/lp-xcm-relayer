@@ -50,6 +50,8 @@ interface AxelarGatewayLike {
 contract AxelarXCMRelayer is Auth {
     address private constant XCM_TRANSACTOR_V2_ADDRESS = 0x000000000000000000000000000000000000080D;
     uint32 private constant CENTRIFUGE_PARACHAIN_ID = 2031;
+    uint8 private constant PALLET_LP_GATEWAY_INDEX = 115;
+    uint8 private constant CALL_PROCESS_MSG_INDEX = 5;
 
     AxelarGatewayLike public immutable axelarGateway;
     address public immutable centrifugeChainOrigin;
@@ -73,7 +75,7 @@ contract AxelarXCMRelayer is Auth {
         bytes payload
     );
 
-    constructor(address centrifugeChainOrigin_, address axelarGateway_) 
+    constructor(address centrifugeChainOrigin_, address axelarGateway_)
     //        uint8 centrifugeChainLiquidityPoolsGatewayPalletIndex_,
     //        uint8 centrifugeChainLiquidityPoolsGatewayPalletProcessMsgCallIndex_
     {
@@ -146,9 +148,7 @@ contract AxelarXCMRelayer is Auth {
             "XCMRelayer/not-approved-by-gateway"
         );
 
-        bytes memory processMsgPayload = _processMsgPayload(sourceChain, sourceAddress, payload);
-        // todo(nuno): fix length passed here
-        bytes memory encodedCall = _centrifugeCall(hex"00", processMsgPayload);
+        bytes memory encodedCall = _centrifugeCall(sourceChain, sourceAddress, payload);
 
         emit Executed(
             encodedCall,
@@ -180,55 +180,24 @@ contract AxelarXCMRelayer is Auth {
         return;
     }
 
+
+    function get_encoded_call(
+        string calldata sourceChain,
+        string calldata sourceAddress,
+        bytes memory message
+    ) public pure returns (bytes memory) {
+        return _centrifugeCall(sourceChain, sourceAddress, message);
+    }
+
+
     /// TMP: Test execute
-    function test_get_encoded_call(
-        bytes memory length,
-        string calldata sourceChain,
-        string calldata sourceAddress,
-        bytes memory message
-    ) public pure returns (bytes memory) {
-        return _centrifugeCall(length, _processMsgPayload(sourceChain, sourceAddress, message));
-    }
-
-    /// TMP
-    function test_get_process_msg_payload(
-        string calldata sourceChain,
-        string calldata sourceAddress,
-        bytes memory message
-    ) public pure returns (bytes memory) {
-        return _processMsgPayload(sourceChain, sourceAddress, message);
-    }
-
-    /// TMP: Test execute given all the indiviual params
-    function test_execute_granular(
-        bytes memory length,
+    function test_execute_msg(
         string calldata sourceChain,
         string calldata sourceAddress,
         bytes memory message
     ) public {
-        bytes memory encodedCall = _centrifugeCall(length, _processMsgPayload(sourceChain, sourceAddress, message));
+        bytes memory encodedCall = _centrifugeCall(sourceChain, sourceAddress, message);
 
-        XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
-            // dest chain
-            _centrifugeParachainMultilocation(),
-            // fee asset
-            _cfgAssetMultilocation(),
-            // the weight limit for the transact call execution
-            xcmWeightInfo.transactWeightAtMost,
-            // the call to be executed on the cent chain
-            encodedCall,
-            // the CFG we offer to pay for execution fees of the whole XCM
-            xcmWeightInfo.feeAmount,
-            // overall XCM weight, the total weight the XCM-transactor extrinsic can use.
-            // This includes all the XCM instructions plus the weight of the Transact call itself.
-            xcmWeightInfo.buyExecutionWeightLimit
-        );
-
-        return;
-    }
-
-    /// TMP: Test execute a given Centrifuge chain encoded call
-    function test_execute_call_whole(bytes memory encodedCall) public {
         XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
             // dest chain
             _centrifugeParachainMultilocation(),
@@ -279,26 +248,56 @@ contract AxelarXCMRelayer is Auth {
     function _parachainId() internal pure returns (bytes memory) {
         return abi.encodePacked(uint8(0), CENTRIFUGE_PARACHAIN_ID);
     }
+
+    // --- Utilities ---
+    function _centrifugeCall(
+        string memory sourceChain,
+        string memory sourceAddress,
+        bytes memory message
+    ) internal pure returns (bytes memory) {
+
+        bytes memory payload = bytes.concat(
+            bytes4(uint32(bytes(sourceChain).length)),
+            bytes(sourceChain),
+            bytes4(uint32(bytes(sourceAddress).length)),
+            bytes(sourceAddress),
+            message
+        );
+
+        bytes memory payloadLength = _compactLen(payload);
+
+        return bytes.concat(
+            bytes1(PALLET_LP_GATEWAY_INDEX),
+            bytes1(CALL_PROCESS_MSG_INDEX),
+            payloadLength,
+            payload
+        );
+    }
 }
 
-// --- Utilities ---
-function _centrifugeCall(bytes memory payloadLength, bytes memory payload) pure returns (bytes memory) {
-    return abi.encodePacked(
-        // LP Gateway pallet
-        hex"73",
-        // LP Gateway process_msg call index
-        hex"05",
-        payloadLength,
-        payload
-    );
-}
 
-// Encode the LiquidityPoolsGateway.process_msg payload
-function _processMsgPayload(string memory sourceChain, string memory sourceAddress, bytes memory message)
-    pure
-    returns (bytes memory)
-{
-    return abi.encodePacked(
-        uint32(bytes(sourceChain).length), sourceChain, uint32(bytes(sourceAddress).length), sourceAddress, message
-    );
+function _compactLen(bytes memory payload) pure returns (bytes memory) {
+    // Panic if length exceeds uint32::MAX
+    require(payload.length < uint256(0xFFFFFFFF),"AxelarXCMRelayer/payload-exceeds-max-length");
+
+    uint32 length = uint32(payload.length);
+
+    // NOTE: The following is the Scale-Codec for
+    //       a Compact<u32> value.
+    if (length <= 0x3F) {
+        bytes1 valueU8 = bytes1((uint8(length) << 2));
+        return bytes.concat(valueU8[0]);
+
+    } else if (length <= 0x3FFF) {
+         bytes2 valueU16 = bytes2(uint16(length) << 2 | 0x1);
+         return bytes.concat(valueU16[1], valueU16[0]);
+
+    } else if (length <= 0x3FFFFFFF) {
+        bytes4 valueU32 = bytes4(uint32(length) << 2 | 0x2);
+        return bytes.concat(valueU32[3], valueU32[2], valueU32[1], valueU32[0]);
+    } else {
+        bytes1 valueU8 = bytes1(uint8(0x3));
+        bytes4 valueU32 = bytes4(length);
+        return bytes.concat(valueU8[0], valueU32[3], valueU32[2], valueU32[1], valueU32[0]);
+    }
 }
