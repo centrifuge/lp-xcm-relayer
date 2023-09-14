@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import {_centrifugeCall} from "src/XCMRelayer.sol";
 
 contract XCMRelayerTest is Test {
-
     function test_centrifuge_call() public {
         string memory sourceChain = "ethereum-2";
         string memory sourceAddress = "0x8503b4452Bf6238cC76CdbEE223b46d7196b1c93";
