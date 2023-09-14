@@ -78,9 +78,9 @@ contract AxelarXCMRelayer is Auth {
         axelarGateway = AxelarGatewayLike(axelarGateway_);
 
         xcmWeightInfo = XcmWeightInfo({
-            buyExecutionWeightLimit: 19000000000,
-            transactWeightAtMost: 8000000000,
-            feeAmount: 1000000000000000000
+            buyExecutionWeightLimit: 15530000000,
+            transactWeightAtMost: 12530000000,
+            feeAmount: 155548480000000000
         });
         lpGatewayPalletIndex = lpGatewayPalletIndex_;
 
