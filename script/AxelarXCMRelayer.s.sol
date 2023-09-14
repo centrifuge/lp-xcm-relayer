@@ -4,7 +4,6 @@ pragma solidity 0.8.21;
 import {AxelarXCMRelayer} from "src/XCMRelayer.sol";
 import "forge-std/Script.sol";
 
-// Script to deploy Axelar over XCM relayer.
 contract AxelarXCMRelayerScript is Script {
     function setUp() public {}
 
@@ -15,9 +14,8 @@ contract AxelarXCMRelayerScript is Script {
 
         AxelarXCMRelayer router = new AxelarXCMRelayer(
             address(vm.envAddress("CENTRIFUGE_CHAIN_ORIGIN")),
-            address(vm.envAddress("AXELAR_GATEWAY"))
-    //            uint8(vm.envUint("CENTRIFUGE_CHAIN_LIQUIDITY_POOLS_GATEWAY_PALLET_INDEX")),
-    //            uint8(vm.envUint("CENTRIFUGE_CHAIN_LIQUIDITY_POOLS_GATEWAY_PALLET_PROCESS_MSG_CALL_INDEX"))
+            address(vm.envAddress("AXELAR_GATEWAY")),
+            uint8(vm.envUint("CENTRIFUGE_CHAIN_LP_GATEWAY_PALLET_INDEX"))
         );
 
         router.rely(admin);
