@@ -50,20 +50,22 @@ interface AxelarGatewayLike {
 contract AxelarXCMRelayer is Auth {
     address private constant XCM_TRANSACTOR_V2_ADDRESS = 0x000000000000000000000000000000000000080D;
     uint32 private constant CENTRIFUGE_PARACHAIN_ID = 2031;
+    uint8 private constant LP_GATEWAY_CALL_INDEX = 5;
 
     AxelarGatewayLike public immutable axelarGateway;
     address public immutable centrifugeChainOrigin;
     mapping(string => string) public axelarEVMRouters;
 
     XcmWeightInfo public xcmWeightInfo;
+    uint8 public immutable lpGatewayPalletIndex;
 
     // --- Events ---
     event File(bytes32 indexed what, XcmWeightInfo xcmWeightInfo);
     event File(bytes32 indexed what, string chain, string addr);
     event Executed(
         bytes payloadWithHash,
-        bytes lpPalletIndex,
-        bytes lpCallIndex,
+        uint8 lpPalletIndex,
+        uint8 lpCallIndex,
         bytes32 sourceChainLength,
         bytes sourceChain,
         bytes32 sourceAddressLength,
@@ -71,15 +73,16 @@ contract AxelarXCMRelayer is Auth {
         bytes payload
     );
 
-    constructor(address centrifugeChainOrigin_, address axelarGateway_) {
+    constructor(address centrifugeChainOrigin_, address axelarGateway_, uint8 lpGatewayPalletIndex_) {
         centrifugeChainOrigin = centrifugeChainOrigin_;
         axelarGateway = AxelarGatewayLike(axelarGateway_);
 
         xcmWeightInfo = XcmWeightInfo({
-            buyExecutionWeightLimit: 19000000000,
-            transactWeightAtMost: 8000000000,
-            feeAmount: 1000000000000000000
+            buyExecutionWeightLimit: 15530000000,
+            transactWeightAtMost: 12530000000,
+            feeAmount: 155548480000000000
         });
+        lpGatewayPalletIndex = lpGatewayPalletIndex_;
 
         wards[msg.sender] = 1;
         emit Rely(msg.sender);
@@ -138,20 +141,13 @@ contract AxelarXCMRelayer is Auth {
             "XCMRelayer/not-approved-by-gateway"
         );
 
-        bytes memory payloadWithLocation = bytes.concat(
-            "0x73",
-            "0x05",
-            bytes32(bytes(sourceChain).length),
-            bytes(sourceChain),
-            bytes32(bytes(sourceAddress).length),
-            bytes(sourceAddress),
-            payload
-        );
+        bytes memory encodedCall =
+            _centrifugeCall(lpGatewayPalletIndex, LP_GATEWAY_CALL_INDEX, sourceChain, sourceAddress, payload);
 
         emit Executed(
-            payloadWithLocation,
-            "0x73",
-            "0x05",
+            encodedCall,
+            lpGatewayPalletIndex,
+            LP_GATEWAY_CALL_INDEX,
             bytes32(bytes(sourceChain).length),
             bytes(sourceChain),
             bytes32(bytes(sourceAddress).length),
@@ -167,7 +163,7 @@ contract AxelarXCMRelayer is Auth {
             // the weight limit for the transact call execution
             xcmWeightInfo.transactWeightAtMost,
             // the call to be executed on the cent chain
-            payloadWithLocation,
+            encodedCall,
             // the CFG we offer to pay for execution fees of the whole XCM
             xcmWeightInfo.feeAmount,
             // overall XCM weight, the total weight the XCM-transactor extrinsic can use.
@@ -208,5 +204,43 @@ contract AxelarXCMRelayer is Auth {
 
     function _parachainId() internal pure returns (bytes memory) {
         return abi.encodePacked(uint8(0), CENTRIFUGE_PARACHAIN_ID);
+    }
+}
+
+// --- Utilities ---
+function _centrifugeCall(
+    uint8 palletIndex,
+    uint8 callIndex,
+    string memory sourceChain,
+    string memory sourceAddress,
+    bytes memory message
+) pure returns (bytes memory) {
+    bytes memory payload = abi.encodePacked(
+        uint32(bytes(sourceChain).length), sourceChain, uint32(bytes(sourceAddress).length), sourceAddress, message
+    );
+
+    return abi.encodePacked(palletIndex, callIndex, _compactLen(payload), payload);
+}
+
+function _compactLen(bytes memory payload) pure returns (bytes memory) {
+    // Panic if length exceeds uint32::MAX
+    require(payload.length < uint256(0xFFFFFFFF), "AxelarXCMRelayer/payload-exceeds-max-length");
+
+    uint32 length = uint32(payload.length);
+
+    // NOTE: The following is the Scale-Codec for a Compact<u32> value.
+    if (length <= 0x3F) {
+        bytes1 valueU8 = bytes1((uint8(length) << 2));
+        return bytes.concat(valueU8[0]);
+    } else if (length <= 0x3FFF) {
+        bytes2 valueU16 = bytes2(uint16(length) << 2 | 0x1);
+        return bytes.concat(valueU16[1], valueU16[0]);
+    } else if (length <= 0x3FFFFFFF) {
+        bytes4 valueU32 = bytes4(uint32(length) << 2 | 0x2);
+        return bytes.concat(valueU32[3], valueU32[2], valueU32[1], valueU32[0]);
+    } else {
+        bytes1 valueU8 = bytes1(uint8(0x3));
+        bytes4 valueU32 = bytes4(length);
+        return bytes.concat(valueU8[0], valueU32[3], valueU32[2], valueU32[1], valueU32[0]);
     }
 }
