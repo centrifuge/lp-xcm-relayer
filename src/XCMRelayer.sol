@@ -174,41 +174,6 @@ contract AxelarXCMRelayer is Auth {
         return;
     }
 
-    /// TMP: remove after testing
-    function get_encoded_call(string calldata sourceChain, string calldata sourceAddress, bytes memory message)
-        public
-        view
-        returns (bytes memory)
-    {
-        return _centrifugeCall(lpGatewayPalletIndex, LP_GATEWAY_CALL_INDEX, sourceChain, sourceAddress, message);
-    }
-
-    /// TMP: Test execute
-    function test_execute_msg(string calldata sourceChain, string calldata sourceAddress, bytes memory message)
-        public
-    {
-        bytes memory encodedCall =
-            _centrifugeCall(lpGatewayPalletIndex, LP_GATEWAY_CALL_INDEX, sourceChain, sourceAddress, message);
-
-        XcmTransactorV2(XCM_TRANSACTOR_V2_ADDRESS).transactThroughSignedMultilocation(
-            // dest chain
-            _centrifugeParachainMultilocation(),
-            // fee asset
-            _cfgAssetMultilocation(),
-            // the weight limit for the transact call execution
-            xcmWeightInfo.transactWeightAtMost,
-            // the call to be executed on the cent chain
-            encodedCall,
-            // the CFG we offer to pay for execution fees of the whole XCM
-            xcmWeightInfo.feeAmount,
-            // overall XCM weight, the total weight the XCM-transactor extrinsic can use.
-            // This includes all the XCM instructions plus the weight of the Transact call itself.
-            xcmWeightInfo.buyExecutionWeightLimit
-        );
-
-        return;
-    }
-
     // --- Outgoing ---
     // A message that has been sent from the Centrifuge Chain, heading to a specific destination EVM chain
     function send(string calldata destinationChain, string calldata destinationAddress, bytes calldata payload)
